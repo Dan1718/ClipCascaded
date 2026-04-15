@@ -23,7 +23,7 @@ from aiortc import (
 )
 
 
-if PLATFORM.startswith(LINUX) and not XMODE:
+if PLATFORM.startswith(LINUX):
     from cli.tray import TaskbarPanel
 else:
     from gui.tray import TaskbarPanel
@@ -50,21 +50,19 @@ class P2PManager(WSInterface):
 
         # Fragment variables
         self.sending_fragment_id = ""  # The id of the fragment currently being sent
-        self.receiving_fragments: dict = (
-            {}
-        )  # Mapping: fragmentid:str -> fragment:list[str]
+        self.receiving_fragments: dict = {}  # Mapping: fragmentid:str -> fragment:list[str]
         self.sending_fragment_stats: str = None
         self.receiving_fragment_stats: str = None
 
         # p2p variables
         self.my_peer_id: str = None  # Own peer id assigned by the server
         self.peers: set[str] = set()  # All peers in this 'room'
-        self.peer_connections: dict[str, RTCPeerConnection] = (
-            {}
-        )  # Mapping: peer_id -> RTCPeerConnection
-        self.data_channels: dict[str, RTCDataChannel] = (
-            {}
-        )  # Mapping: peer_id -> DataChannel
+        self.peer_connections: dict[
+            str, RTCPeerConnection
+        ] = {}  # Mapping: peer_id -> RTCPeerConnection
+        self.data_channels: dict[
+            str, RTCDataChannel
+        ] = {}  # Mapping: peer_id -> DataChannel
         self.live_connections: int = 0  # Number of active connections
 
         # Event loop for asyncio
@@ -600,9 +598,9 @@ class P2PManager(WSInterface):
                     f"{metadata['index'] + 1}/{metadata['totalFragments']}"
                 )
                 if metadata["id"] in self.receiving_fragments:
-                    self.receiving_fragments[metadata["id"]][
-                        metadata["index"]
-                    ] = payload
+                    self.receiving_fragments[metadata["id"]][metadata["index"]] = (
+                        payload
+                    )
                     if metadata["index"] == metadata["totalFragments"] - 1:
                         if all(
                             s != "" for s in self.receiving_fragments[metadata["id"]]
@@ -621,9 +619,9 @@ class P2PManager(WSInterface):
                     self.receiving_fragments[metadata["id"]] = [""] * metadata[
                         "totalFragments"
                     ]
-                    self.receiving_fragments[metadata["id"]][
-                        metadata["index"]
-                    ] = payload
+                    self.receiving_fragments[metadata["id"]][metadata["index"]] = (
+                        payload
+                    )
                     return
 
             if self.config.data["cipher_enabled"]:

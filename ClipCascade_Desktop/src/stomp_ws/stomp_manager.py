@@ -12,7 +12,7 @@ from utils.notification_manager import NotificationManager
 from utils.request_manager import RequestManager
 from core.constants import *
 
-if PLATFORM.startswith(LINUX) and not XMODE:
+if PLATFORM.startswith(LINUX):
     from cli.tray import TaskbarPanel
 else:
     from gui.tray import TaskbarPanel
