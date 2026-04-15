@@ -523,6 +523,9 @@ class P2PManager(WSInterface):
                 self.reset_receiving_fragments()
 
                 raw_payload_size_in_bytes = len(payload.encode("utf-8"))
+                logging.debug(
+                    f"Sending p2p payload type={payload_type} bytes={raw_payload_size_in_bytes} peers={len(self.data_channels)}"
+                )
 
                 if self.config.data["cipher_enabled"]:
                     payload = CipherManager.encode_to_json_string(
@@ -563,6 +566,10 @@ class P2PManager(WSInterface):
                         )
                 else:
                     self.reset_sending_fragment_id()
+            else:
+                logging.debug(
+                    f"Skipping p2p send for unchanged payload type={payload_type}"
+                )
 
         except Exception as e:
             logging.error(f"Failed to send data: {e}")
@@ -578,6 +585,11 @@ class P2PManager(WSInterface):
             payload = body["payload"]
             payload_type = body.get("type", "text")
             metadata = body.get("metadata")
+            logging.debug(
+                f"Received p2p payload type={payload_type} fragment={metadata['index'] + 1}/{metadata['totalFragments']}"
+                if metadata is not None and metadata.get("isFragmented")
+                else f"Received p2p payload type={payload_type} bytes={len(payload.encode('utf-8'))}"
+            )
 
             # Check if the payload exceeds the maximum size: first layer protection
             if (
@@ -629,10 +641,22 @@ class P2PManager(WSInterface):
                     **CipherManager.decode_from_json_string(payload)
                 )
 
+            previous_clipboard_hash = self.clipboard_manager.previous_clipboard_hash
             if self.clipboard_manager.has_clipboard_changed(payload):
                 self.reset_receiving_fragments()
-                self.clipboard_manager.base64_to_clipboard(
+                applied = self.clipboard_manager.base64_to_clipboard(
                     base64_string=payload, type_=payload_type
+                )
+                if not applied:
+                    self.clipboard_manager.previous_clipboard_hash = (
+                        previous_clipboard_hash
+                    )
+                    logging.debug(
+                        f"Remote p2p payload apply failed; restored previous clipboard hash type={payload_type}"
+                    )
+            else:
+                logging.debug(
+                    f"Ignoring p2p payload with unchanged clipboard hash type={payload_type}"
                 )
         except json.decoder.JSONDecodeError:
             logging.error(

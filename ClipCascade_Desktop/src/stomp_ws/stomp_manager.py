@@ -106,12 +106,19 @@ class STOMPManager(WSInterface):
         try:
             if self.is_connected:
                 if self.clipboard_manager.has_clipboard_changed(payload):
+                    logging.debug(
+                        f"Sending websocket payload type={payload_type} bytes={len(payload.encode('utf-8'))}"
+                    )
                     if self.config.data["cipher_enabled"]:
                         payload = CipherManager.encode_to_json_string(
                             **self.cipher_manager.encrypt(payload)
                         )
                     body = json.dumps({"payload": payload, "type": payload_type})
                     self.client.send(destination=SEND_DESTINATION, body=body)
+                else:
+                    logging.debug(
+                        f"Skipping websocket send for unchanged payload type={payload_type}"
+                    )
         except Exception as e:
             logging.error(f"Failed to send data: {e}")
 
@@ -121,14 +128,29 @@ class STOMPManager(WSInterface):
                 body = json.loads(frame.body)
                 payload = body["payload"]
                 payload_type = body.get("type", "text")
+                logging.debug(
+                    f"Received websocket payload type={payload_type} bytes={len(payload.encode('utf-8'))}"
+                )
                 if self.config.data["cipher_enabled"]:
                     payload = self.cipher_manager.decrypt(
                         **CipherManager.decode_from_json_string(payload)
                     )
 
+                previous_clipboard_hash = self.clipboard_manager.previous_clipboard_hash
                 if self.clipboard_manager.has_clipboard_changed(payload):
-                    self.clipboard_manager.base64_to_clipboard(
+                    applied = self.clipboard_manager.base64_to_clipboard(
                         base64_string=payload, type_=payload_type
+                    )
+                    if not applied:
+                        self.clipboard_manager.previous_clipboard_hash = (
+                            previous_clipboard_hash
+                        )
+                        logging.debug(
+                            f"Remote websocket payload apply failed; restored previous clipboard hash type={payload_type}"
+                        )
+                else:
+                    logging.debug(
+                        f"Ignoring websocket payload with unchanged clipboard hash type={payload_type}"
                     )
         except json.decoder.JSONDecodeError:
             logging.error(

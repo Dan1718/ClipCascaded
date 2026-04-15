@@ -10,6 +10,8 @@ _callback_update = None
 _clipboard_thread = None
 
 _block_image_once = False
+_blocked_clipboard_type = None
+_blocked_clipboard_content = None
 
 _is_gdk_running = False
 _run_poll = threading.Event()
@@ -56,7 +58,7 @@ def _monitor_x_wl_clipboard(
     enable_image_monitoring=False,
     enable_file_monitoring=False,
 ):
-    global _block_image_once
+    global _block_image_once, _blocked_clipboard_type, _blocked_clipboard_content
     last_error = None
     previous_clipboard: str | bytes | None = None
     ignore_patterns = [
@@ -101,6 +103,16 @@ def _monitor_x_wl_clipboard(
                 text = text.decode("utf-8")
                 if len(text) > 0 and text != previous_clipboard:
                     previous_clipboard = text
+                    if (
+                        _blocked_clipboard_type == "text"
+                        and text == _blocked_clipboard_content
+                    ):
+                        logging.debug(
+                            "Ignoring locally applied text clipboard update from polling loop"
+                        )
+                        _blocked_clipboard_type = None
+                        _blocked_clipboard_content = None
+                        continue
                     if _callback_update:
                         _callback_update("text", text)
             else:
@@ -129,6 +141,16 @@ def _monitor_x_wl_clipboard(
             if success:
                 if image != previous_clipboard:
                     previous_clipboard = image
+                    if (
+                        _blocked_clipboard_type == "image"
+                        and image == _blocked_clipboard_content
+                    ):
+                        logging.debug(
+                            "Ignoring locally applied image clipboard update from polling loop"
+                        )
+                        _blocked_clipboard_type = None
+                        _blocked_clipboard_content = None
+                        continue
                     if _callback_update and not _block_image_once:
                         _callback_update("image", image)
                     else:
@@ -293,7 +315,12 @@ def _start(enable_image_monitoring=False, enable_file_monitoring=False):
 
 
 def stop():
-    global _clipboard_thread, _callback_update, _block_image_once, _run_poll, _is_gdk_running
+    global \
+        _clipboard_thread, \
+        _callback_update, \
+        _block_image_once, \
+        _run_poll, \
+        _is_gdk_running
     if _clipboard_thread:
         if _is_gdk_running:
             import gi
@@ -320,6 +347,12 @@ def wait():
 def enable_block_image_once():
     global _block_image_once
     _block_image_once = True
+
+
+def ignore_next_update(type_: str, content):
+    global _blocked_clipboard_type, _blocked_clipboard_content
+    _blocked_clipboard_type = type_
+    _blocked_clipboard_content = content
 
 
 def on_update(callback, enable_image_monitoring=False, enable_file_monitoring=False):

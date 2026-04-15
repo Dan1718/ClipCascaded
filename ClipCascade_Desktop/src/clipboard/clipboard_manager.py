@@ -130,6 +130,17 @@ class ClipboardManager:
             enable_file_monitoring=self.config.data["enable_file_sharing"],
         )
 
+    @staticmethod
+    def _describe_payload(payload: any, payload_type: str) -> str:
+        if payload_type == "text":
+            return f"text bytes={len(payload.encode('utf-8'))}"
+        if payload_type == "image":
+            return f"image bytes={ClipboardManager.get_image_size(payload)}"
+        if payload_type == "files":
+            count = len(payload) if payload is not None else 0
+            return f"files count={count} bytes={ClipboardManager.calculate_cumulative_file_size(payload)}"
+        return payload_type
+
     def clipboard_to_base64(self, callback, content: any, type_: str = "text"):
         try:
             self.reset_files_download()
@@ -137,6 +148,9 @@ class ClipboardManager:
             type_ = type_.lower()
             if type_ == "text":
                 if self.is_clipboard_size_within_limit(content, type_):
+                    logging.debug(
+                        f"Local clipboard changed: {ClipboardManager._describe_payload(content, type_)}"
+                    )
                     callback(content, type_)
 
             elif type_ == "image":
@@ -148,6 +162,9 @@ class ClipboardManager:
 
                     content = Image.open(content[0])
                 if self.is_clipboard_size_within_limit(content, type_):
+                    logging.debug(
+                        f"Local clipboard changed: {ClipboardManager._describe_payload(content, type_)}"
+                    )
                     content_str = ClipboardManager.convert_image_to_base64(img=content)
                     callback(content_str, type_)
 
@@ -163,6 +180,9 @@ class ClipboardManager:
                         content = temp
 
                 if self.is_clipboard_size_within_limit(content, type_):
+                    logging.debug(
+                        f"Local clipboard changed: {ClipboardManager._describe_payload(content, type_)}"
+                    )
                     content_str = ClipboardManager.convert_files_to_base64(
                         file_paths=content
                     )
@@ -176,19 +196,34 @@ class ClipboardManager:
             if type_ == "text":
                 txt = base64_string
                 if self.is_clipboard_size_within_limit(txt, type_):
+                    logging.debug(
+                        f"Applying remote clipboard: text bytes={len(txt.encode('utf-8'))}"
+                    )
                     self.paste(txt, type_)
+                    return True
             elif type_ == "image":
                 img = ClipboardManager.convert_base64_to_image(base64_img=base64_string)
                 if self.is_clipboard_size_within_limit(img, type_):
+                    logging.debug(
+                        f"Applying remote clipboard: image bytes={ClipboardManager.get_image_size(img)}"
+                    )
                     self.paste(img, type_)
+                    return True
             elif type_ == "files":
                 file_objects = ClipboardManager.convert_base64_to_files(
                     base64_json=base64_string
                 )
                 if self.is_clipboard_size_within_limit(file_objects, type_):
+                    logging.debug(
+                        "Applying remote clipboard: "
+                        + ClipboardManager._describe_payload(file_objects, type_)
+                    )
                     self.paste(file_objects, type_)
+                    return True
         except Exception as e:
             logging.error(f"Failed to convert base64 data to clipboard: {e}")
+
+        return False
 
     @staticmethod
     def execute_command(*args, input_data):
@@ -218,6 +253,7 @@ class ClipboardManager:
                 if PLATFORM == WINDOWS or PLATFORM == MACOS:
                     pyperclip.copy(payload)
                 elif PLATFORM.startswith(LINUX):
+                    clipboard_monitor.ignore_next_update(payload_type, payload)
                     if XMODE and self.is_x_clipboard_owner:
                         ClipboardManager.execute_command(
                             "xclip",
@@ -259,6 +295,7 @@ class ClipboardManager:
                         png_data = output.getvalue()
 
                     clipboard_monitor.enable_block_image_once()  # Block image copy to prevent deadlock
+                    clipboard_monitor.ignore_next_update(payload_type, png_data)
                     if XMODE and self.is_x_clipboard_owner:
                         ClipboardManager.execute_command(
                             "xclip",

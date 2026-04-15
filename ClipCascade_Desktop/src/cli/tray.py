@@ -1,5 +1,6 @@
 import math
 import os
+import sys
 import threading
 import time
 import webbrowser
@@ -56,6 +57,14 @@ class TaskbarPanel:
     def run(self):
         Echo("-" * 53)
         self.menu_items, self.numbered_menu = self.create_menu()
+
+        if not sys.stdin.isatty():
+            logging.info(
+                "No interactive terminal detected; running ClipCascade headlessly"
+            )
+            while not self.loop_terminate:
+                time.sleep(1)
+            return
 
         while not self.loop_terminate:
             Echo("\n")

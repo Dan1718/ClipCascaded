@@ -84,7 +84,7 @@ elif PLATFORM.startswith(LINUX):
 RECONNECT_WS_TIMER = 10  # seconds
 WEBSOCKET_TIMEOUT = 3000  # milliseconds
 LOG_FILE_NAME = "clipcascade_log.log"
-LOG_LEVEL = logging.INFO  # Use valid levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
+LOG_LEVEL = logging.DEBUG  # Use valid levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
 DATA_FILE_NAME = "DATA"
 MAX_SIZE = 1048576  # 1 MiB
 FRAGMENT_SIZE = 15360  # 15 KiB
